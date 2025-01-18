@@ -14,7 +14,7 @@ import productRoutes from './routes/productRoutes.js'
 import adminProductsRouter from './routes/products-routes.js'
 import cloudinaryRoutes from './routes/cloudinaryRoutes.js';
 import connectCloudinary from './config/cloudinaryConfig.js';
-// import 'bootstrap/dist/css/bootstrap.min.css';
+
 
 
 dotenv.config();
