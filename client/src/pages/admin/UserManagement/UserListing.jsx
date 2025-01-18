@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axiosInstance from '../../../utils/axiosConfig'
 import './UserListing.css';
 import AdminBreadcrumbs from '../UserManagement/AdminBreadcrumbs';
+import axios from 'axios';
 
 const UserListing = () => {
   const [users, setUsers] = useState([]);
@@ -14,9 +14,13 @@ const UserListing = () => {
     const fetchUsers = async () => {
       setIsLoading(true);
       try {
-        const response = await axiosInstance.get('/admin/users');
-
+        console.log('1111111111111111')
+        const response = await axios.get('http://localhost:5000/api/admin/users',{
+          withCredentials : true,
+        });
+        console.log('asdfghjklqwertyuio',response)
         if (Array.isArray(response.data)) {
+          
           setUsers(response.data);
         } else if (response.data && Array.isArray(response.data.users)) {
           setUsers(response.data.users);
@@ -47,7 +51,7 @@ const UserListing = () => {
     }
 
     fetchUsers();
-  }, [navigate]);
+  }, []);
 
   const handleBlockUnblock = async (id, action) => {
     const confirmAction = window.confirm(`Are you sure you want to ${action} this user?`);
@@ -55,7 +59,7 @@ const UserListing = () => {
   
     try {
 
-      await axiosInstance.put(`/admin/users/${id}/${action}`);
+      await axios.put(`http://localhost:5000/api/admin/users/${id}/${action}`);
   
       setUsers((prev) =>
         prev.map((user) =>
@@ -82,6 +86,7 @@ const UserListing = () => {
     <div className="user-listing">
       <header>
         <h1>User Management</h1>
+        <AdminBreadcrumbs />
       </header>
 
       {error && (

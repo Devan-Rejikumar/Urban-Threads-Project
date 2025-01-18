@@ -1,54 +1,28 @@
-// import { configureStore } from '@reduxjs/toolkit';
-// import { persistStore, persistReducer } from 'redux-persist';
-// import storage from 'redux-persist/lib/storage';
-// import authReducer from '../slices/authSlice'
-
-// const persistConfig = {
-//     key: 'root',
-//     storage,
-//     whitelist: ['auth']
-// };
-
-// const persistedReducer = persistReducer(persistConfig, authReducer);
-
-// export const store = configureStore({
-//     reducer: {
-//         auth: persistedReducer
-//     },
-//     middleware: (getDefaultMiddleware) =>
-//         getDefaultMiddleware({
-//             serializableCheck: false
-//         })
-// });
-
-// export const persistor = persistStore(store);
-
 import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
-import authReducer from '../slices/authSlice';
+import userAuthReducer from '../slices/userAuthSlice';
+import adminAuthReducer from '../slices/adminAuthSlice';
 
-// Separate configs for user and admin
 const userPersistConfig = {
     key: 'userAuth',
     storage,
-    whitelist: ['isAuthenticated', 'user']
+    whitelist: ['isAuthenticated', 'user', 'token']
 };
 
 const adminPersistConfig = {
     key: 'adminAuth',
     storage,
-    whitelist: ['isAuthenticated', 'user']
+    whitelist: ['isAuthenticated', 'user', 'token']
 };
 
-// Create separate reducers for user and admin
-const userAuthReducer = persistReducer(userPersistConfig, authReducer);
-const adminAuthReducer = persistReducer(adminPersistConfig, authReducer);
+const persistedUserReducer = persistReducer(userPersistConfig, userAuthReducer);
+const persistedAdminReducer = persistReducer(adminPersistConfig, adminAuthReducer);
 
 export const store = configureStore({
     reducer: {
-        userAuth: userAuthReducer,
-        adminAuth: adminAuthReducer
+        userAuth: persistedUserReducer,
+        adminAuth: persistedAdminReducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
@@ -57,5 +31,3 @@ export const store = configureStore({
 });
 
 export const persistor = persistStore(store);
-
-

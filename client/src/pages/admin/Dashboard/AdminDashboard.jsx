@@ -1,58 +1,33 @@
-// import React, { Fragment } from 'react';
-// import { Link, Outlet } from 'react-router-dom'; // Import Outlet
-// import './AdminDashboard.css';
 
-// const AdminDashboard = () => {
-//   return (
-//     <Fragment>
-//       <h1 className='heading'>Admin Dashboard</h1>
-//      <div className="admin-dashboard">
-//         {/* Sidebar */}
-//         <div className="sidebar">
-//           <nav>
-//             <ul>
-//               <li>
-//                 <Link to="products" className="sidebar-link">Product</Link>
-//               </li>
-//               <li>
-//                 <Link to="categories" className="sidebar-link">Category</Link>
-//               </li>
-//               <li>
-//                 <Link to="users" className="sidebar-link">User Listing</Link>
-//               </li>
-//             </ul>
-//           </nav>
-//         </div>
-
-//         {/* Main Content Area */}
-//         <div className="main-content">
-//           <Outlet /> {/* This is where nested routes will render */}
-
-//         </div>
-//       </div>
-//     </Fragment>
-
-//   );
-// };
-
-// export default AdminDashboard;
 import React, { Fragment } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-// import { logout } from '../../../redux/slices/authSlice';
-import { adminLogout as logout } from '../../../redux/slices/authSlice';
+import { adminLogout as logout } from '../../../redux/slices/adminAuthSlice';
 import './AdminDashboard.css';
+import Cookies from 'js-cookie';
+import axios from 'axios';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const handleLogout = () => {
-    // Dispatch logout action
-    dispatch(logout());
-    
-    // Navigate to login page
-    navigate('/admin-login', { replace: true });
+  const handleLogout = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/admin/adminLogout', {}, {
+        withCredentials: true, 
+      });
+
+      if(response.status === 200){
+        dispatch(logout());
+        navigate('/admin-login', { replace: true });
+
+      }else{
+        console.error('Failed to log out');
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+
   };
 
   return (

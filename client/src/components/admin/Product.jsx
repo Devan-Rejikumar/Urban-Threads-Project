@@ -75,7 +75,7 @@ const Product = () => {
 
     const formattedVariants = product.variants.map(variant => ({
       size: variant.size || 'M',
-      color: variant.color || '#000000', // Provide default color if none exists
+      color: variant.color || '#000000', 
       stock: variant.stock || 0
     }));
 
@@ -96,7 +96,7 @@ const Product = () => {
     console.log('Attempting to toggle product:', productId);
     
     try {
-      // Log the full URL we're trying to access
+      
       const url = `http://localhost:5000/api/products/${productId}`;
       console.log('Making request to:', url);
       
@@ -126,7 +126,7 @@ const Product = () => {
       
       toast.error('Failed to update product status');
       
-      // If the product wasn't found, refresh the list
+     
       if (error.response?.status === 404) {
         console.log('Product not found, refreshing list...');
         fetchProducts();

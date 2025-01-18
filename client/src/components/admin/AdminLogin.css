@@ -1,4 +1,4 @@
-/* Container and background */
+
 .login-container {
     min-height: 100vh;
     display: flex;
@@ -9,7 +9,7 @@
     overflow: hidden;
   }
   
-  /* Animated background dots */
+
   .background-dot {
     position: absolute;
     border-radius: 50%;
@@ -26,7 +26,7 @@
     }
   }
   
-  /* Login card */
+
   .login-card {
     width: 100%;
     max-width: 400px;
@@ -38,7 +38,7 @@
     padding: 32px;
   }
   
-  /* Card header and logo */
+
   .card-header {
     text-align: center;
     margin-bottom: 32px;
@@ -67,7 +67,7 @@
     font-size: 14px;
   }
   
-  /* Form styles */
+ 
   .login-form {
     display: flex;
     flex-direction: column;
@@ -103,7 +103,7 @@
     border-color: #10b981;
   }
   
-  /* Remember me and forgot password */
+
   .form-options {
     display: flex;
     justify-content: space-between;
@@ -140,7 +140,7 @@
     text-decoration: underline;
   }
   
-  /* Login button */
+
   .login-button {
     background-color: #10b981;
     color: white;
@@ -157,7 +157,7 @@
     background-color: #059669;
   }
   
-  /* Responsive adjustments */
+
   @media (max-width: 480px) {
     .login-card {
       margin: 16px;

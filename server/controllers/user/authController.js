@@ -1,20 +1,24 @@
 import User from '../../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import passport from 'passport';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
+import { resolve } from 'path';
+import { decode } from 'punycode';
 
 dotenv.config();
 
 const secretKey = process.env.JWT_SECRET;
 
 
+const pendingRegistrations = new Map();
+
 const createTransporter = async () => {
     try {
         console.log('Setting up email transporter with user:', process.env.EMAIL_USER);
 
-        // Create test account for development if no credentials
+
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
             console.log('No email credentials found, creating test account...');
             const testAccount = await nodemailer.createTestAccount();
@@ -29,16 +33,14 @@ const createTransporter = async () => {
                 }
             });
         }
-
-        // Production Gmail configuration
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASSWORD
             },
-            debug: true, // Enable debug logging
-            logger: true  // Enable built-in logger
+            debug: true,
+            logger: true
         });
 
         console.log('Verifying transporter configuration...');
@@ -50,10 +52,6 @@ const createTransporter = async () => {
         throw new Error(`Failed to configure email transport: ${error.message}`);
     }
 };
-
-
-
-
 
 
 const sendVerificationEmail = async (email, otp) => {
@@ -84,8 +82,6 @@ const sendVerificationEmail = async (email, otp) => {
 
         const info = await transporter.sendMail(mailOptions);
         console.log('Email sent successfully:', info.response);
-
-        // If using ethereal email in development, log preview URL
         if (info.previewUrl) {
             console.log('Preview URL:', info.previewUrl);
         }
@@ -103,9 +99,6 @@ const sendVerificationEmail = async (email, otp) => {
 };
 
 
-
-const pendingRegistrations = new Map();
-
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
@@ -121,7 +114,6 @@ const registerUser = async (req, res) => {
             passwordLength: password ? password.length : 0
         });
 
-        // Validation checks
         const validationErrors = {
             firstName: !firstName && 'First name is required',
             lastName: !lastName && 'Last name is required',
@@ -142,23 +134,18 @@ const registerUser = async (req, res) => {
                 errors
             });
         }
-
-        // Check for existing user
         const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) {
             return res.status(400).json({ message: 'Email already registered' });
         }
-
-        // Generate OTP
         const otp = generateOTP();
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-        // Hash password
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Store registration data temporarily with OTP
-        const registrationId = crypto.randomUUID(); // Generate unique ID
+        const registrationId = crypto.randomUUID();
         pendingRegistrations.set(registrationId, {
             userData: {
                 firstName,
@@ -172,12 +159,11 @@ const registerUser = async (req, res) => {
             otpExpiry
         });
 
-        // Set cleanup timeout (10 minutes)
+
         setTimeout(() => {
             pendingRegistrations.delete(registrationId);
         }, 10 * 60 * 1000);
 
-        // Send verification email
         const emailSent = await sendVerificationEmail(email, otp);
 
         if (!emailSent) {
@@ -186,7 +172,6 @@ const registerUser = async (req, res) => {
                 message: 'Failed to send verification email. Please try again.'
             });
         }
-
         res.status(201).json({
             message: 'Please verify your email to complete registration.',
             registrationId,
@@ -204,8 +189,6 @@ const verifyOTP = async (req, res) => {
     try {
         const { registrationId, otp } = req.body;
         console.log(registrationId, otp)
-
-        // Get pending registration data
         const registrationData = pendingRegistrations.get(registrationId);
         console.log('Registration data retrieved:', registrationData);
 
@@ -216,20 +199,18 @@ const verifyOTP = async (req, res) => {
             });
         }
 
-        // Verify OTP
-        if (String(registrationData.otp) !== String(otp)) {
-            console.log(3)
-            return res.status(400).json({ message: 'Invalid OTP' });
-        }
-
-        // Check if OTP is expired
         if (new Date() > registrationData.otpExpiry) {
             console.log(4)
             pendingRegistrations.delete(registrationId);
             return res.status(400).json({ message: 'OTP expired. Please register again.' });
         }
 
-        // Create and save user
+
+        if (String(registrationData.otp) !== String(otp)) {
+            console.log(3)
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+
         const newUser = new User({
             ...registrationData.userData,
             googleId: undefined,
@@ -241,7 +222,6 @@ const verifyOTP = async (req, res) => {
 
 
 
-        // Generate JWT token
         const token = jwt.sign(
             { id: newUser._id, email: newUser.email },
             process.env.JWT_SECRET,
@@ -260,10 +240,10 @@ const verifyOTP = async (req, res) => {
         pendingRegistrations.delete(registrationId);
 
         return res.status(200).json({
-            
+
             message: 'Registration completed successfully',
-            
-            // token,
+
+            token,
             user: {
                 id: newUser._id,
                 email: newUser.email,
@@ -327,6 +307,8 @@ const resendOTP = async (req, res) => {
     }
 };
 
+
+
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -361,24 +343,27 @@ const loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Invalid email or password' });
         }
 
+
         const token = jwt.sign(
-            { id: user._id, email: user.email },
+            { id: user._id, email: user.email, id: user._id },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
+        console.log(token);
 
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 1000,
+            secure: false,
+            sameSite: 'none',
+            maxAge: 3600000, // 1 hour
             path: '/'
         });
+        console.log('Cookie set, checking cookies:', req.cookies);
 
-
-        res.status(200).json({
+        // Send both token and user data in response
+        return res.status(200).json({
             message: 'Login successful',
-            token,
+            token, // Include token in response for client-side storage
             user: {
                 id: user._id,
                 email: user.email,
@@ -387,7 +372,6 @@ const loginUser = async (req, res) => {
                 status: user.status
             }
         });
-
 
     } catch (error) {
         console.error('Login error:', error);
@@ -428,47 +412,98 @@ const googleCallback = (req, res) => {
 
 const handleGoogleSignup = async (req, res) => {
     try {
-        console.log(req.body);
-        const { firstName, lastName, userName, email, googleId } = req.body.userDetails;
+        const { firstName, lastName, email, googleId } = req.body.userDetails;
 
-        const isExist = await User.findOne({ email });
-        if (isExist) {
-            const token = await jwt.sign({ _id: isExist._id }, secretKey, {
-                expiresIn: "30d",
-            });
-            res.cookie("user_token", token, {
+        let user = await User.findOne({
+            $or: [
+                { email: email.toLowerCase() },
+                { googleId }
+            ]
+        });
+
+        if (user) {
+            // If user exists but doesn't have googleId, update it
+            if (!user.googleId) {
+                user.googleId = googleId;
+                await user.save();
+            }
+
+            const token = jwt.sign(
+                { id: user._id, email: user.email },
+                process.env.JWT_SECRET,
+                { expiresIn: '1h' }
+            );
+
+            // Set token in cookie
+            res.cookie('token', token, {
                 httpOnly: true,
-                maxAge: 30 * 24 * 60 * 60 * 1000,
-                secure: false,
-                sameSite: "lax",
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 1000, // 1 hour
+                path: '/'
             });
-            return res.status(200).json(googleId);
+
+            // Return existing user data
+            return res.status(200).json({
+                message: 'Login successful',
+                user: {
+                    id: user._id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    status: user.status
+                }
+            });
         }
 
-        await User.create({
+        // If user doesn't exist, create new user
+        const newUser = new User({
             firstName,
             lastName,
-
-            email,
+            email: email.toLowerCase(),
             googleId,
+            isVerified: true,  // Google users are considered verified
+            status: 'active',
+            // Generate a random password for Google users
+            password: await bcrypt.hash(crypto.randomBytes(20).toString('hex'), 10)
         });
 
-        const token = await jwt.sign({ _id: googleId }, secretKey, {
-            expiresIn: "30d",
-        });
-        res.cookie("user_token", token, {
+        await newUser.save();
+
+        // Generate token for new user
+        const token = jwt.sign(
+            { id: newUser._id, email: newUser.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // Set token in cookie
+        res.cookie('token', token, {
             httpOnly: true,
-            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-            secure: false, // Set to true in production with HTTPS
-            sameSite: "lax",
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 1000, // 1 hour
+            path: '/'
         });
+
+        // Return new user data
         return res.status(201).json({
-            message: "user created successfully",
-            id: req.body.googleId,
+            message: 'Registration successful',
+            user: {
+                id: newUser._id,
+                email: newUser.email,
+                firstName: newUser.firstName,
+                lastName: newUser.lastName,
+                status: newUser.status
+            }
         });
+
     } catch (error) {
-        console.log("googlesignup", error);
-        res.status(500).json('internal server')
+        console.error('Google signup error:', error);
+        res.status(500).json({
+            message: 'Internal server error during Google signup',
+            error: error.message
+        });
     }
 };
 
@@ -532,5 +567,278 @@ const logout = async (req, res) => {
         return res.status(500).json({ message: 'Error during logout' });
     }
 };
-export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout };
+
+const verifyUserToken = async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'No token provided or invalid format' });
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({ message: 'No token found' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (user.status !== 'active') {
+            return res.status(403).json({ message: 'You have been blocked' });
+        }
+
+        res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                status: user.status
+            }
+        });
+    } catch (error) {
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token' });
+        }
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired' });
+        }
+        console.error('Token verification error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const getUserProfile = async (req, res) => {
+    try {
+
+        if (!req.user) {
+            return res.status(401).json({ message: "User not authenticated" })
+        }
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(400).json({ message: "User not found" })
+        }
+
+        res.status(200).json({
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            status: user.status,
+
+
+        })
+    } catch (error) {
+        console.error('Error fetching user profile:', error)
+        res.status(500).json({ message: 'Server error while fetching profile' })
+
+    }
+}
+
+const updateUsersProfile = async (req, res) => {
+    try {
+        const { firstName, lastName, email, phone } = req.body;
+        const validationErrors = {};
+
+        if (!firstName) validationErrors.firstName = 'First name is required';
+        if (!lastName) validationErrors.lastName = 'Last name is required';
+        if (!email) {
+            validationErrors.email = 'Email is required';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            validationErrors.email = 'Invalid email format';
+        }
+        if (!phone) validationErrors.phone = 'Phone number is required';
+
+        if (Object.keys(validationErrors).length > 0) {
+            return res.status(400).json({
+                message: 'Validation failed',
+                errors: validationErrors
+            });
+        }
+
+        const existingUser = await User.findOne({
+            email: email.toLowerCase(),
+            _id: { $ne: req.user.id }
+        })
+
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email is already in use by another person' })
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id,
+            {
+                firstName,
+                lastName,
+                email: email.toLowerCase(),
+                phone,
+                updatedAt: Date.now()
+            },
+            { new: true }
+
+
+        )
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' })
+        }
+
+        res.status(200).json({
+            message: 'Profile updated Succesfully',
+            user: {
+                firstName: updatedUser.firstName,
+                lastName: updatedUser.lastName,
+                email: updatedUser.email,
+                phone: updatedUser.phone,
+                status: updatedUser.status
+            }
+        })
+    } catch (error) {
+        console.error('Profile update error:', error);
+        res.status(500).json({
+            message: 'Server error while updating profile'
+        });
+    }
+}
+
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email: email.toLowerCase() })
+
+        if (!user) {
+            return res.status(404).json({ message: "No account found with this email" })
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiry = new Date(Date.now() + 30 * 60 * 1000);
+
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+
+        user.resetPasswordToken = hashedToken;
+        user.resetPasswordExpires = resetTokenExpiry;
+        await user.save();
+
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+        const transporter = await createTransporter();
+        await transporter.sendMail({
+            from: `"Password Reset" <${process.env.EMAIL_USER}>`,
+            to: user.email,
+            subject: 'Password Reset Request',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #333; text-align: center;">Password Reset Request</h1>
+                    <p style="font-size: 16px;">You requested a password reset. Click the button below to reset your password:</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${resetUrl}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+                    </div>
+                    <p style="color: #666; font-size: 14px;">This link will expire in 30 minutes.</p>
+                    <p style="color: #999; font-size: 12px;">If you didn't request this reset, please ignore this email.</p>
+                </div>
+            `
+        });
+
+        res.status(200).json({
+            message: 'Password reset link sent to your email',
+            success: true
+        });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ message: 'Error sending reset email' });
+    }
+}
+
+const verifyResetToken = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        // Hash token to compare with stored hash
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                message: 'Invalid or expired reset token',
+                validToken: false
+            });
+        }
+
+        res.status(200).json({
+            message: 'Token is valid',
+            validToken: true
+        });
+
+    } catch (error) {
+        console.error('Verify reset token error:', error);
+        res.status(500).json({ message: 'Error verifying reset token' });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { password, confirmPassword } = req.body;
+
+        if (password !== confirmPassword) {
+            return res.status(400).json({ message: 'Passwords do not match' });
+        }
+
+        // Hash token to compare with stored hash
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired reset token' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+
+        // Clear reset token fields
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+
+        await user.save();
+
+        res.status(200).json({
+            message: 'Password reset successful',
+            success: true
+        });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ message: 'Error resetting password' });
+    }
+};
+
+
+
+
+export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword };
 

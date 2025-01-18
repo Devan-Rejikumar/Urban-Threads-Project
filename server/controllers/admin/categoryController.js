@@ -22,8 +22,8 @@ const uploadBase64ImageToCloudinary = async (base64Image) => {
             crop: "fill",
             quality: 'auto',
             fetch_format: 'auto',
-            chunk_size: 6000000,        // 6MB chunks
-            timeout: 120000             // 2 minute timeout
+            chunk_size: 6000000,        
+            timeout: 120000             
           },
           (error, result) => {
             if (error) {
